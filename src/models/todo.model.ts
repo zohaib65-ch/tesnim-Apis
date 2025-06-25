@@ -34,10 +34,10 @@ const todoSchema = new Schema<ITodo>(
     },
     title: {
       type: String,
-      required: [true, "Todo title is required"],
       trim: true,
       maxlength: [100, "Title cannot be more than 100 characters"],
     },
+
     description: {
       type: String,
       trim: true,

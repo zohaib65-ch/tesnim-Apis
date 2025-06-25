@@ -35,10 +35,11 @@ const calendarEventSchema = new Schema<ICalendarEvent>(
     },
     title: {
       type: String,
-      required: [true, "Event title is required"],
+      required: false,
       trim: true,
       maxlength: [100, "Title cannot be more than 100 characters"],
     },
+
     description: {
       type: String,
       trim: true,
@@ -74,10 +75,7 @@ const calendarEventSchema = new Schema<ICalendarEvent>(
     },
     color: {
       type: String,
-      match: [
-        /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/,
-        "Please enter a valid hex color",
-      ],
+      match: [/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, "Please enter a valid hex color"],
     },
     todo: {
       type: Schema.Types.ObjectId,
@@ -97,7 +95,4 @@ calendarEventSchema.index({ user: 1, startTime: 1 });
 calendarEventSchema.index({ user: 1, eventType: 1 });
 calendarEventSchema.index({ user: 1, isRecurring: 1 });
 
-export const CalendarEvent = mongoose.model<ICalendarEvent>(
-  "CalendarEvent",
-  calendarEventSchema
-);
+export const CalendarEvent = mongoose.model<ICalendarEvent>("CalendarEvent", calendarEventSchema);

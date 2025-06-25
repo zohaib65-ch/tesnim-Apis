@@ -2,7 +2,7 @@ import Joi from "joi";
 import { TodoPriority, TodoStatus } from "../models/todo.model";
 
 export const createTodoSchema = Joi.object({
-  title: Joi.string().max(100).required().trim(),
+  title: Joi.string().max(100).trim(),
   description: Joi.string().max(500).trim().allow("", null),
   dueDate: Joi.date().iso().allow(null),
   priority: Joi.string()

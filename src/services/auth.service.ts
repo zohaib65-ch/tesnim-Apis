@@ -1,11 +1,7 @@
 import crypto from "crypto";
 import { User, IUser } from "../models/user.model";
 import { AppError } from "../utils/appError";
-import {
-  generateToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from "../utils/jwt";
+import { generateToken, generateRefreshToken, verifyRefreshToken } from "../utils/jwt";
 import { emailService } from "./email.service";
 import {
   RegisterUserInput,
@@ -22,40 +18,42 @@ import { logger } from "../utils/logger";
 
 class AuthService {
   // Register a new user
-  async register(userData: RegisterUserInput): Promise<AuthResponse> {
+  async register(userData: RegisterUserInput): Promise<AuthResponse & { message: string }> {
     const { email, password, firstName, lastName } = userData;
+    const normalizedEmail = email.toLowerCase();
 
-    // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       throw new AppError("User with this email already exists", 400);
     }
 
-    // Generate email verification token
     const verificationToken = crypto.randomBytes(32).toString("hex");
 
-    // Create new user
     const user = await User.create({
-      email,
+      email: normalizedEmail,
       password,
       firstName,
       lastName,
       verificationToken,
     });
 
-    // Send verification email
-    await emailService.sendVerificationEmail(user.email, verificationToken);
+    // Try to send verification email (optional failure)
+    try {
+      await emailService.sendVerificationEmail(user.email, verificationToken);
+    } catch (error) {
+      logger.error(`Failed to send verification email: ${error}`);
+      // Don't throw, just log
+    }
 
-    // Generate tokens
     const token = generateToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    // Store refresh token
     user.refreshToken = refreshToken;
     await user.save();
 
     return {
       success: true,
+      message: "User registered successfully", // ✅ Success message here
       token,
       refreshToken,
       user: {
@@ -111,9 +109,7 @@ class AuthService {
   }
 
   // Refresh token
-  async refreshToken(
-    refreshData: RefreshTokenInput
-  ): Promise<{ token: string }> {
+  async refreshToken(refreshData: RefreshTokenInput): Promise<{ token: string }> {
     const { refreshToken } = refreshData;
 
     try {
@@ -150,25 +146,20 @@ class AuthService {
   }
 
   // Forgot password
-  async forgotPassword(
-    forgotData: ForgotPasswordInput
-  ): Promise<{ success: boolean }> {
+  async forgotPassword(forgotData: ForgotPasswordInput): Promise<{ success: boolean }> {
     const { email } = forgotData;
 
     // Find user by email
     const user = await User.findOne({ email });
+
     if (!user) {
       throw new AppError("User with this email does not exist", 404);
     }
 
     // Generate reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
-
     // Hash token and set to resetPasswordToken field
-    user.resetPasswordToken = crypto
-      .createHash("sha256")
-      .update(resetToken)
-      .digest("hex");
+    user.resetPasswordToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
     // Set expiry (30 minutes)
     user.resetPasswordExpires = new Date(Date.now() + 30 * 60 * 1000);
@@ -178,6 +169,7 @@ class AuthService {
     // Send email with reset token
     try {
       await emailService.sendPasswordResetEmail(user.email, resetToken);
+
       return { success: true };
     } catch (error) {
       user.resetPasswordToken = undefined;
@@ -185,14 +177,12 @@ class AuthService {
       await user.save();
 
       logger.error(`Failed to send password reset email: ${error}`);
-      throw new AppError("Failed to send password reset email", 500);
+      throw new AppError(`Failed to send password reset email: ${error}`, 500);
     }
   }
 
   // Reset password
-  async resetPassword(
-    resetData: ResetPasswordInput
-  ): Promise<{ success: boolean }> {
+  async resetPassword(resetData: ResetPasswordInput): Promise<{ success: boolean }> {
     const { token, password } = resetData;
 
     // Hash token to compare with stored hash
@@ -226,9 +216,7 @@ class AuthService {
   }
 
   // Verify email
-  async verifyEmail(
-    verifyData: VerifyEmailInput
-  ): Promise<{ success: boolean }> {
+  async verifyEmail(verifyData: VerifyEmailInput): Promise<{ success: boolean }> {
     const { token } = verifyData;
 
     // Find user by verification token
@@ -246,10 +234,7 @@ class AuthService {
   }
 
   // Change password (when user is logged in)
-  async changePassword(
-    userId: string,
-    changeData: ChangePasswordInput
-  ): Promise<{ success: boolean }> {
+  async changePassword(userId: string, changeData: ChangePasswordInput): Promise<{ success: boolean }> {
     const { currentPassword, newPassword } = changeData;
 
     // Find user by ID
@@ -280,10 +265,7 @@ class AuthService {
   }
 
   // Update user profile
-  async updateProfile(
-    userId: string,
-    updateData: UpdateProfileInput
-  ): Promise<{ success: boolean; user: Partial<IUser> }> {
+  async updateProfile(userId: string, updateData: UpdateProfileInput): Promise<{ success: boolean; user: Partial<IUser> }> {
     // Find user by ID
     const user = await User.findById(userId);
     if (!user) {
